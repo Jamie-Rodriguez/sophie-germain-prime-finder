@@ -5,8 +5,8 @@ This is a small repo for a problem where I needed to generate _safe_ prime numbe
 
 After writing this small code, which was sufficient for my needs, I found that it could be a good example to learn profiling and benchmarking of code.
 
-First Iteration
-===============
+First Iteration: Trial Division
+===============================
 
 My initial implementation used a simple algorithm which I've seen referred to as _trial division_.
 
@@ -14,7 +14,7 @@ The `is_prime()` function checks whether a number `n` is prime by first handling
 
 We need to use the `is_prime()` twice for each candidate `n` - we need to check that *both* `n` and `2n + 1` are prime.
 
-Time complexity analysis
+Time Complexity Analysis
 ------------------------
 
 A single trial division test on `n` is O(√n). As previously mentioned, each Sophie Germain check does two prime checks via `is_prime()` - one for `n` and one for `2n + 1`. Therefore each candidate costs O(√n).
@@ -26,18 +26,20 @@ So the expected total cost is roughly O(√n⋅ln²(n)) - though this is a heuri
 Note
 ----
 
-There's also a subtle precision issue worth noting: casting to `double` in `sqrt((double)n)` loses precision for very large `unsigned long long` values (above ~2^53), which could make the `sqrt(n) + 1` bound inaccurate and produce wrong results for numbers near the top of the 64-bit range. As this is was just intended for relatively small safe primes, it shouldn't be much of an issue, but worth noting if you want to go close to the 64-bit range.
+There's also a subtle precision issue worth noting: casting to `double` in `sqrt((double)n)` loses precision for very large `unsigned long long` values (above ~2^53), which could make the `sqrt(n) + 1` bound inaccurate and produce wrong results for numbers near the top of the 64-bit range. As this was just intended for relatively small safe primes, it shouldn't be much of an issue, but worth noting if you want to go close to the 64-bit range.
 
-Profiling bottleneck analysis
+Profiling Bottleneck Analysis
 -----------------------------
 
 ### Benchmarking with Hyperfine
 
 ```
 Benchmark 1: build/sophie-germain-prime-finder 1000000000000000000
-  Time (mean ± σ):      9.351 s ±  0.035 s    [User: 9.236 s, System: 0.036 s]
-  Range (min … max):    9.298 s …  9.411 s    10 runs
+  Time (mean ± σ):      9.379 s ±  0.044 s    [User: 9.249 s, System: 0.037 s]
+  Range (min … max):    9.325 s …  9.457 s    10 runs
 ```
+
+### LLVM Profiling
 
 Using LLVM's profiling tools shows (irrelevant lines of code removed):
 
@@ -98,3 +100,101 @@ Looking at the funnel, of 421 candidates tested, 403 weren't actually prime i.e.
 Before doing an expensive primality test, we could use a cheap sieve to eliminate candidates divisible by small primes (3, 5, 7, 11, ...). For example, single modulus by 3 can eliminate roughly a third of candidates instantly, before you ever enter the expensive loop! This could be made even more powerful by applying the fast sieve to both `n` and `2n + 1`.
 
 Note that although this sieve performance improvement does not affect the **asymptotic** complexity of the algorithm, it improves the algorithm by large **constant** factors and so is still worth doing - large constant factor improvements matter a lot in practice! As a theoretical example, the difference between O(√n · ln²(n)) with a constant factor of 1 versus the same expression with a constant factor of 0.05 could be the difference between a program that takes minutes and one that takes seconds.
+
+Second Iteration: Adding a sieve
+================================
+
+Adding the aforementioned sieve to `next_sophie_germain_prime()` results in a speedup of 2.72×, or an approximate 63% reduction in execution time. This closely follows the reduction in calls to `is_prime()` (from 12.0 billion to 4.47 billion).
+
+Profiling Bottleneck Analysis
+-----------------------------
+
+### Benchmarking with Hyperfine
+
+```
+Benchmark 2: build/sophie-germain-prime-finder 1000000000000000000
+  Time (mean ± σ):      3.444 s ±  0.023 s    [User: 3.398 s, System: 0.013 s]
+  Range (min … max):    3.422 s …  3.483 s    10 runs
+```
+
+### LLVM Profiling
+
+```
+    7|     67|bool is_prime(unsigned long long n) {
+    8|     67|	if (n < 2)
+    9|      0|		return false;
+   10|     67|	if (n == 2)
+   11|      0|		return true;
+   12|     67|	if (n % 2 == 0)
+   13|      0|		return false;
+   14|       |
+   15|     67|	unsigned long long sqrt_n_plus_1 = (unsigned long long)sqrt((double)n) + 1;
+   16|       |
+   17|  4.47G|	for (unsigned long long i = 3; i <= sqrt_n_plus_1; i += 2)
+                                                                  ^4.47G
+   18|  4.47G|		if (n % i == 0)
+   19|     60|			return false;
+   20|       |
+   21|      7|	return true;
+   22|     67|}
+   23|       |
+   24|     61|bool is_sophie_germain_prime(unsigned long long n) {
+   25|     61|	if (!is_prime(n))
+   26|     55|		return false;
+   27|       |
+   28|      6|	return is_prime(2 * n + 1);
+   29|     61|}
+   30|       |
+   31|      1|unsigned long long next_sophie_germain_prime(unsigned long long n) {
+   32|      1|	unsigned long long candidate = n + 1;
+   33|       |
+   34|      1|	if (candidate <= 2) {
+   35|      0|		if (is_sophie_germain_prime(2))
+   36|      0|			return 2;
+   37|       |
+   38|      0|		candidate = 3;
+   39|      1|	} else if (candidate % 2 == 0) {
+   40|      0|		candidate++;
+   41|      0|	}
+   42|       |
+   43|    421|	while (1) {
+               ^1
+   44|       |		// Cheap rejection before expensive test
+   45|    421|		if (candidate % 3 == 0 || (2 * candidate + 1) % 3 == 0 ||
+                                          ^281
+   46|    141|		    candidate % 5 == 0 || (2 * candidate + 1) % 5 == 0 ||
+                                          ^113
+   47|    360|		    candidate % 7 == 0 || (2 * candidate + 1) % 7 == 0) {
+                    ^85                   ^73
+   48|    360|		    candidate += 2;
+   49|    360|			continue;
+   50|    360|		}
+   51|       |
+   52|     61|		if (is_sophie_germain_prime(candidate))
+   53|      1|			return candidate;
+   54|       |
+   55|     60|		candidate += 2;
+   56|     60|	}
+   57|       |
+   58|      0|	return candidate;
+   59|      1|}
+```
+
+Interestingly the profiling data of the number of times each sieve check is hit closely follows the `(p - 2)/p` survival rate predicted by sieve theory - the same multiplicative structure that underpins the Hardy-Littlewood conjecture for Sophie Germain prime density.
+
+| Stage       | Survival rate       | Predicted | Actual | Error |
+|-------------|---------------------|-----------|--------|-------|
+| Enter sieve | —                   | 421       | 421    | —     |
+| After p=3   | (3−2)/3 = 1/3       | 140.3     | 141    | +0.5% |
+| After p=5   | (5−2)/5 = 3/5       | 84.2      | 85     | +1.0% |
+| After p=7   | (7−2)/7 = 5/7       | 60.1      | 61     | +1.5% |
+
+The theoretical and profiling results also show the diminishing returns of adding more prime checks to the sieve.
+
+1. p=3 eliminates 2/3 ≈ 66% of candidates
+2. p=5 eliminates 2/5 ≈ 40% of the survivors
+3. p=7 eliminates 2/7 ≈ 29% of what's left
+4. p=11 would eliminate 2/11 ≈ 18%
+5. p=13 would eliminate 2/13 ≈ 15%
+
+So we see the most dramatic gains by just using 3, 5 and 7 as the sieve.

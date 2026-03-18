@@ -40,8 +40,20 @@ unsigned long long next_sophie_germain_prime(unsigned long long n) {
 		candidate++;
 	}
 
-	while (!is_sophie_germain_prime(candidate))
+	while (1) {
+		// Cheap rejection before expensive test
+		if (candidate % 3 == 0 || (2 * candidate + 1) % 3 == 0 ||
+		    candidate % 5 == 0 || (2 * candidate + 1) % 5 == 0 ||
+		    candidate % 7 == 0 || (2 * candidate + 1) % 7 == 0) {
+		    candidate += 2;
+			continue;
+		}
+
+		if (is_sophie_germain_prime(candidate))
+			return candidate;
+
 		candidate += 2;
+	}
 
 	return candidate;
 }
