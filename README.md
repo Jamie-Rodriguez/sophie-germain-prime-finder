@@ -198,3 +198,33 @@ The theoretical and profiling results also show the diminishing returns of addin
 5. p=13 would eliminate 2/13 ≈ 15%
 
 So we see the most dramatic gains by just using 3, 5 and 7 as the sieve.
+
+Third Iteration: Fixing `sqrt()` Floating-Point Precision Loss
+==============================================================
+
+Next I was curious about finding a way to fix the floating point precision loss in the use of the `sqrt()` function in `is_prime()`. Since we don't actually need the precise irrational square root, and only really need _the closest integer to the true square root_, we can use the Newton-Raphson Method to achieve this.
+
+Because I already am looking at profiling and benchmarking, we can simply observe the performance of the new change. For this change, as long as we remain below a 20% decrease in performance, I will deem it an acceptable change in favour of fixing the precision-loss issue.
+
+Profiling & Benchmarking Analysis
+---------------------------------
+
+### Benchmarking with Hyperfine
+
+Previous implementation (from Second Implementation):
+
+```
+Benchmark 3: build/sophie-germain-prime-finder 1000000000000000000
+  Time (mean ± σ):      3.424 s ±  0.010 s    [User: 3.397 s, System: 0.011 s]
+  Range (min … max):    3.404 s …  3.453 s    50 runs
+```
+
+New implementation (using the Newton-Raphson Method):
+
+```
+Benchmark 4: build/sophie-germain-prime-finder 1000000000000000000
+  Time (mean ± σ):      3.380 s ±  0.010 s    [User: 3.354 s, System: 0.010 s]
+  Range (min … max):    3.362 s …  3.404 s    50 runs
+```
+
+Surprisingly, the Newton-Raphson Method is showing slightly better performance than `sqrt()`!

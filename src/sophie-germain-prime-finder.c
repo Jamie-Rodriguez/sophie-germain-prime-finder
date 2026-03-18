@@ -1,7 +1,28 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <math.h>
+
+/**
+ * Returns the largest integer x such that x * x <= n.
+ * Uses the Newton-Raphson Method with pure integer arithmetic
+ */
+unsigned long long isqrt(unsigned long long n) {
+	if (n <= 1)
+		return n;
+
+	// Initial overestimate: shift by half the bit-width of n.
+	// __builtin_clzll operates on unsigned long long.
+	unsigned long long x = 1ull << ((64 - __builtin_clzll(n)) / 2 + 1);
+
+	for (;;) {
+		unsigned long long x_new = (x + n / x) / 2;
+
+		if (x_new >= x)
+			return x;
+
+		x = x_new;
+	}
+}
 
 // Uses trial division
 bool is_prime(unsigned long long n) {
@@ -12,7 +33,7 @@ bool is_prime(unsigned long long n) {
 	if (n % 2 == 0)
 		return false;
 
-	unsigned long long sqrt_n_plus_1 = (unsigned long long)sqrt((double)n) + 1;
+	unsigned long long sqrt_n_plus_1 = isqrt(n) + 1;
 
 	for (unsigned long long i = 3; i <= sqrt_n_plus_1; i += 2)
 		if (n % i == 0)
