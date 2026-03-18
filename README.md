@@ -228,3 +228,59 @@ Benchmark 4: build/sophie-germain-prime-finder 1000000000000000000
 ```
 
 Surprisingly, the Newton-Raphson Method is showing slightly better performance than `sqrt()`!
+
+Assembly Analysis
+-----------------
+
+This is a bit peculiar, because I would think that `math.h`'s `sqrt()` would use a lot of hardware-backed functions for faster speed.
+
+I decided to investigate the assembly of the Newton-Raphson Method versus `math.h`'s `sqrt()`. This is on a M1 MacBook:
+
+```
+objdump -d --no-show-raw-insn bin/sophie-germain-prime-finder-mathh-sqrt | grep '^[0-9a-f]* <.*>:'
+0000000100000460 <_next_sophie_germain_prime>:
+00000001000005cc <_main>:
+000000010000069c <__stubs>:
+```
+
+The compiler inlined the functions `is_prime()` and `is_sophie_germain_prime()`, however reading a bit, we can find the relevant section as it's quite distinct, I've added some annotations:
+
+```asm
+100000550:     	ucvtf	d0, x0     ; convert n to double
+100000554:     	fsqrt	d0, d0     ; *hardware* square root
+100000558:     	fcvtzu	x16, d0    ; convert result to uint64
+10000055c:     	add	x16, x16, #0x1 ; add 1
+```
+
+The Newton-Raphson Method implementation did not inline `is_prime()`, but inlined our function `isqrt()`:
+
+```
+objdump -d --no-show-raw-insn bin/sophie-germain-prime-finder-newton-raphson | grep '^[0-9a-f]* <.*>:'
+0000000100000460 <_is_prime>:
+00000001000004f0 <_next_sophie_germain_prime>:
+0000000100000688 <_main>:
+0000000100000758 <__stubs>:
+```
+
+Observing the results of `objdump -d --no-show-raw-insn bin/sophie-germain-prime-finder-newton-raphson | awk '/^[0-9a-f]+ <_is_prime>:/,/^$/'`, we see a more complex assembly:
+
+```asm
+; Initial estimate setup
+100000470:  clz   x8, x0         ; count leading zeros of n
+100000474:  mov   w9, #0x40      ; 64
+100000478:  sub   w8, w9, w8     ; bit_width = 64 - clz(n)
+10000047c:  lsr   w8, w8, #1     ; bit_width / 2
+100000480:  add   w8, w8, #0x1   ; bit_width / 2 + 1
+100000484:  mov   w9, #0x1
+100000488:  lsl   x9, x9, x8     ; x = 1 << (bit_width/2 + 1)
+; loop
+10000048c:  mov   x8, x9         ; x = x_new  (or x on first iteration)
+100000490:  udiv  x9, x0, x9     ; x_new = n / x
+100000494:  add   x9, x9, x8     ; x_new = n / x + x
+100000498:  lsr   x9, x9, #1     ; x_new = (n / x + x) / 2
+10000049c:  cmp   x9, x8         ; compare x_new with x
+1000004a0:  csel  x9, x9, x8, lo ; x9 = (x_new < x) ? x_new : x
+1000004a4:  b.lo  0x10000048c    ; if x_new < x, loop again
+```
+
+As we can see, even only considering the loop, it's still more instructions than `math.h`'s `sqrt()`, and does not use any special hardware functions for speed.
