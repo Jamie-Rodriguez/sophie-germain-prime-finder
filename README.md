@@ -26,7 +26,7 @@ So the expected total cost is roughly O(√n⋅ln²(n)) - though this is a heuri
 Note
 ----
 
-There's also a subtle precision issue worth noting: casting to `double` in `sqrt((double)n)` loses precision for very large `unsigned long long` values (above ~2^53), which could make the `sqrt(n) + 1` bound inaccurate and produce wrong results for numbers near the top of the 64-bit range. As this was just intended for relatively small safe primes, it shouldn't be much of an issue, but worth noting if you want to go close to the 64-bit range.
+There's also a subtle precision issue worth noting: casting to `double` in `sqrt((double)n)` loses precision for very large `unsigned long long` values (above ~2^53) of `n` as IEEE-754 64-bit binary floating-point numbers have a 53-bit significand. Casting an `unsigned long long` to `double` rounds it, and `sqrt()` can return a value that's off by 1 or more! This could result in the `sqrt(n) + 1` bound being inaccurate and produce wrong results for numbers near the top of the 64-bit range. As this was just intended for relatively small safe primes, it shouldn't be much of an issue, but worth noting if you want to go close to the 64-bit range.
 
 Profiling Bottleneck Analysis
 -----------------------------
@@ -101,13 +101,13 @@ Before doing an expensive primality test, we could use a cheap sieve to eliminat
 
 Note that although this sieve performance improvement does not affect the **asymptotic** complexity of the algorithm, it improves the algorithm by large **constant** factors and so is still worth doing - large constant factor improvements matter a lot in practice! As a theoretical example, the difference between O(√n · ln²(n)) with a constant factor of 1 versus the same expression with a constant factor of 0.05 could be the difference between a program that takes minutes and one that takes seconds.
 
-Second Iteration: Adding a sieve
+Second Iteration: Adding a Sieve
 ================================
 
 Adding the aforementioned sieve to `next_sophie_germain_prime()` results in a speedup of 2.72×, or an approximate 63% reduction in execution time. This closely follows the reduction in calls to `is_prime()` (from 12.0 billion to 4.47 billion).
 
-Profiling Bottleneck Analysis
------------------------------
+Profiling & Benchmarking Analysis
+---------------------------------
 
 ### Benchmarking with Hyperfine
 
