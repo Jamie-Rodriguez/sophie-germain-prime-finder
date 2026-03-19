@@ -284,3 +284,49 @@ Observing the results of `objdump -d --no-show-raw-insn bin/sophie-germain-prime
 ```
 
 As we can see, even only considering the loop, it's still more instructions than `math.h`'s `sqrt()`, and does not use any special hardware functions for speed. So I'm not exactly sure why this code is faster at this point in time.
+
+I created a "microbenchmark", which ran a loop of calls to the Newton-Raphson Method `isqrt()` and calls to `math.h`'s `sqrt()`, and timed how long they took:
+
+```
+isqrt (Newton-Raphson): 41.0633 s  (4.1 ns/call)
+sqrt  (fsqrt):          7.5222 s   (0.8 ns/call)
+Ratio (isqrt / sqrt):   5.459×
+```
+
+When these functions are run in isolation, they behave as we would expect, with `math.h`'s `sqrt()` being around 5.5× faster than my Newton-Raphson `isqrt()`.
+
+This leads me to believe that the speed up is not due to the `isqrt()` function directly, but due to it causing the compiler to optimise the codepaths for the processor in some complex ways like optimising branch prediction, cache lines or  alleviating register pressure.
+
+Testing Compiler Inlining
+-------------------------
+
+In the previous section I noticed that the `sqrt()` implementation inlined the `is_prime()` function. Out of curiosity, I added the compiler attribute `__attribute__((noinline))` to `is_prime()` in the `sqrt()` implementation:
+
+```
+objdump -d --no-show-raw-insn bin/sophie-germain-prime-finder-sqrt-no-inline | grep '^[0-9a-f]* <.*>:'
+0000000100000460 <_is_prime>:
+00000001000004c8 <_next_sophie_germain_prime>:
+0000000100000610 <_main>:
+00000001000006e0 <__stubs>:
+
+Benchmark 5: bin/sophie-germain-prime-finder-sqrt-no-inline 1000000000000000000
+  Time (mean ± σ):      3.405 s ±  0.015 s    [User: 3.378 s, System: 0.010 s]
+  Range (min … max):    3.376 s …  3.450 s    50 runs
+```
+
+This didn't make a difference to the performance.
+
+Similarly the converse - adding `__attribute__((always_inline))` to `is_prime()` in the Newton-Raphson implementation didn't seem to affect performance.
+
+```
+objdump -d --no-show-raw-insn bin/sophie-germain-prime-finder-nr-always-inline | grep '^[0-9a-f]* <.*>:'
+0000000100000460 <_next_sophie_germain_prime>:
+0000000100000618 <_main>:
+00000001000006e8 <__stubs>:
+
+Benchmark 6: bin/sophie-germain-prime-finder-nr-always-inline 1000000000000000000
+  Time (mean ± σ):      3.396 s ±  0.015 s    [User: 3.368 s, System: 0.010 s]
+  Range (min … max):    3.363 s …  3.447 s    50 runs
+```
+
+So the inlining is not affecting performance or optimisation.
