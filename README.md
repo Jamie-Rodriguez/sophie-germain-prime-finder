@@ -266,21 +266,21 @@ Observing the results of `objdump -d --no-show-raw-insn bin/sophie-germain-prime
 
 ```armasm
 ; Initial estimate
-100000470:     	clz	x8, x0                  ; count leading zeros of n
-100000474:     	mov	w9, #0x40               ; (load the value 64 into w9)
-100000478:     	sub	w8, w9, w8              ; bit_width = 64 - clz(n)
-10000047c:     	lsr	w8, w8, #1              ; bit_width / 2
-100000480:     	add	w8, w8, #0x1            ; bit_width / 2 +1
-100000484:     	mov	w9, #0x1                ; (load the value 1 into w9)
-100000488:     	lsl	x9, x9, x8              ; x = 1 << (bit_width / 2 + 1)
+100000470:     	clz	x8, x0             ; count leading zeros of n
+100000474:     	mov	w9, #0x40          ; (load the value 64 into w9)
+100000478:     	sub	w8, w9, w8         ; bit_width = 64 - clz(n)
+10000047c:     	lsr	w8, w8, #1         ; bit_width / 2
+100000480:     	add	w8, w8, #0x1       ; bit_width / 2 +1
+100000484:     	mov	w9, #0x1           ; (load the value 1 into w9)
+100000488:     	lsl	x9, x9, x8         ; x = 1 << (bit_width / 2 + 1)
 ; Loop
-10000048c:     	mov	x8, x9                  ; x = x_new (or on first iteration)
-100000490:     	udiv	x9, x0, x9          ; x_new = n / x
-100000494:     	add	x9, x9, x8              ; x_new = n / x + x
-100000498:     	lsr	x9, x9, #1              ; x_new = (n / x + x) / 2
-10000049c:     	cmp	x9, x8                  ; compare x_new with x
-1000004a0:     	csel	x9, x9, x8, lo      ; x9 = x_new < x ? x_new : x
-1000004a4:     	b.lo	0x10000048c         ; if x_new < x, loop again
+10000048c:     	mov	x8, x9             ; x = x_new (or on first iteration)
+100000490:     	udiv	x9, x0, x9     ; x_new = n / x
+100000494:     	add	x9, x9, x8         ; x_new = n / x + x
+100000498:     	lsr	x9, x9, #1         ; x_new = (n / x + x) / 2
+10000049c:     	cmp	x9, x8             ; compare x_new with x
+1000004a0:     	csel	x9, x9, x8, lo ; x9 = x_new < x ? x_new : x
+1000004a4:     	b.lo	0x10000048c    ; if x_new < x, loop again
 ```
 
 As we can see, even only considering the loop, it's still more instructions than `math.h`'s `sqrt()`, and does not use any special hardware functions for speed.
