@@ -232,9 +232,9 @@ Surprisingly, the Newton-Raphson Method is showing slightly better performance t
 Assembly Analysis
 -----------------
 
-This is a bit peculiar, because I would think that `math.h`'s `sqrt()` would use a lot of hardware-backed functions for faster speed.
+This is quite peculiar, because I would think that `math.h`'s `sqrt()` would use a lot of hardware-backed functions for faster speed, however I've benchmarked both implementations several times, and the New-tonRaphson approach is consistently a little faster than the `sqrt()` method.
 
-I decided to investigate the assembly of the Newton-Raphson Method versus `math.h`'s `sqrt()`. This is on a M1 MacBook:
+I decided to investigate the assembly of the Newton-Raphson Method versus `math.h`'s `sqrt()`. This is on a M1 MacBook, compiled using Clang:
 
 ```
 objdump -d --no-show-raw-insn bin/sophie-germain-prime-finder-mathh-sqrt | grep '^[0-9a-f]* <.*>:'
@@ -283,4 +283,4 @@ Observing the results of `objdump -d --no-show-raw-insn bin/sophie-germain-prime
 1000004a4:     	b.lo	0x10000048c    ; if x_new < x, loop again
 ```
 
-As we can see, even only considering the loop, it's still more instructions than `math.h`'s `sqrt()`, and does not use any special hardware functions for speed.
+As we can see, even only considering the loop, it's still more instructions than `math.h`'s `sqrt()`, and does not use any special hardware functions for speed. So I'm not exactly sure why this code is faster at this point in time.
